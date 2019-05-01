@@ -1,12 +1,39 @@
 'use strict';
 
+// Load Environment Vairables from the .env file
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const superagent =  require('superagent');
+
+// ----------------------------*
+//
+// Configure Server
+//
+// ----------------------------*
 
 const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
+
+// ----------------------------*
+//
+// Errors
+//
+// ----------------------------*
+
+// let handleError = (err, response) => {
+//   console.error(err);
+//   if (response) response.status(500).send('Internal Server Error Encountered');
+// };
+
+// ----------------------------*
+//
+// Constructor Functions
+//
+// ----------------------------*
+
 
 app.get('/location', (request, response) => {
   try {
@@ -19,8 +46,10 @@ app.get('/location', (request, response) => {
   }
 });
 
+//---------------Constructor Functions----------------------//
 function convertLatLong(query){
   let geoData = require('./data/geo.json');
+  // let geoData = url('https://maps.googleapis.com/maps/api/geocode/outputFormat?parameters');
   let location = {
     search_query: query,
     formatted_query: geoData.results[0].formatted_address,
@@ -30,23 +59,24 @@ function convertLatLong(query){
   return location;
 }
 
+// ----------------------------*
+//
+// Route Callbacks
+//
+// ----------------------------*
+
+
 app.get('/weather', (request, response) =>{
   try {
-    let days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    let month = ['Jan', 'Feb', 'Mar', 'Apl', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let darksky = require('./data/darksky.json');
     let result = [];
 
     darksky.daily.data.forEach(object => {
-      let date = new Date(object.time * 1000);
-      let time = [days[date.getDay()], month[date.getMonth()], date.getDate(), date.getFullYear()].join(' ');
+      let date = new Date(object.time * 1000).toString().slice(0,15);
       let forecast = object.summary;
-
-      let info = getWeather(forecast, time);
-
+      let info = getWeather(forecast, date);
       result.push(info);
     });
-
     response.send(result);
   } catch(e) {
     let message = handleErrors(e);
@@ -63,6 +93,15 @@ function getWeather(forecast, time){
   return weatherInfo;
 }
 
+
+// ----------------------------*
+//
+// Routes
+//
+// ----------------------------*
+
+
+//--------------Handle Errors-------------------//
 function handleErrors() {
   let errObj = {
     status: 500,
@@ -70,5 +109,17 @@ function handleErrors() {
   };
   return errObj;
 }
+//-------------------API Routes-------------------//
+// put stuff here 
 
-app.listen(PORT);
+
+// ----------------------------*
+//
+// PowerOn
+//
+// ----------------------------*
+
+//Make sure the server is listening for requests
+//entry point
+
+app.listen(PORT, () => console.log(`App is listening on ${PORT}`));
