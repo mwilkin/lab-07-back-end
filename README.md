@@ -50,3 +50,28 @@ Start time: 10:30
 Finish time: 12:00
 
 Actual time needed to complete: 1.5 hours
+
+###################
+Lab 07
+Authors:  Mark Swearingen and Matt Wilkin
+###################
+Number and name of feature: Set up Repo
+
+Estimate of time needed to complete: 1 hours
+
+Start time: 8:10
+
+Finish time: 9:10
+
+Actual time needed to complete: 1.0 hours
+
+###################
+Number and name of feature: Code Review
+
+Estimate of time needed to complete: 0:30 hours
+
+Start time: 9:10
+
+Finish time: 
+
+Actual time needed to complete:  hours
