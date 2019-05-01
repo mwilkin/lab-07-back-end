@@ -1,10 +1,12 @@
 'use strict';
 
+// Load Environment Vairables from the .env file
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 // const superagent =  require('superagent');
 
+//Application Setup
 const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
@@ -20,6 +22,7 @@ app.get('/location', (request, response) => {
   }
 });
 
+//---------------Constructor Functions----------------------//
 function convertLatLong(query){
   let geoData = require('./data/geo.json');
   let location = {
@@ -30,6 +33,7 @@ function convertLatLong(query){
   };
   return location;
 }
+
 
 app.get('/weather', (request, response) =>{
   try {
@@ -58,6 +62,7 @@ function getWeather(forecast, time){
   return weatherInfo;
 }
 
+//--------------Handle Errors-------------------//
 function handleErrors() {
   let errObj = {
     status: 500,
@@ -65,5 +70,11 @@ function handleErrors() {
   };
   return errObj;
 }
+//-------------------API Routes-------------------//
+// put stuff here 
 
-app.listen(PORT);
+
+//Make sure the server is listening for requests
+//entry point
+
+app.listen(PORT, () => console.log(`App is listening on ${PORT}`));
