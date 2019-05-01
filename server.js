@@ -25,6 +25,7 @@ app.get('/location', (request, response) => {
 //---------------Constructor Functions----------------------//
 function convertLatLong(query){
   let geoData = require('./data/geo.json');
+  // let geoData = url('https://maps.googleapis.com/maps/api/geocode/outputFormat?parameters');
   let location = {
     search_query: query,
     formatted_query: geoData.results[0].formatted_address,

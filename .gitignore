@@ -16,6 +16,13 @@
 # .nfs files are created when an open file is removed but is still being accessed
 .nfs*
 
+# dotenv environment variables file
+.env
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
 ### macOS ###
 # General
 .DS_Store
@@ -78,10 +85,6 @@ bower_components
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
-
-# Dependency directories
-node_modules/
-jspm_packages/
 
 # TypeScript v1 declaration files
 typings/
