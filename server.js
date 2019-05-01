@@ -1,15 +1,39 @@
 'use strict';
 
 // Load Environment Vairables from the .env file
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-// const superagent =  require('superagent');
+const superagent =  require('superagent');
 
-//Application Setup
+// ----------------------------*
+//
+// Configure Server
+//
+// ----------------------------*
+
 const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
+
+// ----------------------------*
+//
+// Errors
+//
+// ----------------------------*
+
+// let handleError = (err, response) => {
+//   console.error(err);
+//   if (response) response.status(500).send('Internal Server Error Encountered');
+// };
+
+// ----------------------------*
+//
+// Constructor Functions
+//
+// ----------------------------*
+
 
 app.get('/location', (request, response) => {
   try {
@@ -34,6 +58,12 @@ function convertLatLong(query){
   };
   return location;
 }
+
+// ----------------------------*
+//
+// Route Callbacks
+//
+// ----------------------------*
 
 
 app.get('/weather', (request, response) =>{
@@ -63,6 +93,14 @@ function getWeather(forecast, time){
   return weatherInfo;
 }
 
+
+// ----------------------------*
+//
+// Routes
+//
+// ----------------------------*
+
+
 //--------------Handle Errors-------------------//
 function handleErrors() {
   let errObj = {
@@ -74,6 +112,12 @@ function handleErrors() {
 //-------------------API Routes-------------------//
 // put stuff here 
 
+
+// ----------------------------*
+//
+// PowerOn
+//
+// ----------------------------*
 
 //Make sure the server is listening for requests
 //entry point
