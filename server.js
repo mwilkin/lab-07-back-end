@@ -33,21 +33,15 @@ function convertLatLong(query){
 
 app.get('/weather', (request, response) =>{
   try {
-    let days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    let month = ['Jan', 'Feb', 'Mar', 'Apl', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let darksky = require('./data/darksky.json');
     let result = [];
 
     darksky.daily.data.forEach(object => {
-      let date = new Date(object.time * 1000);
-      let time = [days[date.getDay()], month[date.getMonth()], date.getDate(), date.getFullYear()].join(' ');
+      let date = new Date(object.time * 1000).toString().slice(0,15);
       let forecast = object.summary;
-
-      let info = getWeather(forecast, time);
-
+      let info = getWeather(forecast, date);
       result.push(info);
     });
-
     response.send(result);
   } catch(e) {
     let message = handleErrors(e);
