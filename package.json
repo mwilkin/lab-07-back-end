@@ -6,22 +6,18 @@
   "scripts": {
     "test": "jest",
     "start": "node server.js",
-    "watch": "nodemon"
+    "watch": "nodemon",
+    "deploy": "git push heroku master",
+    "seedDB": "psql -d city_explorer -f ./data.schema.sql",
+  "homepage": "https://github.com/MarkArlenSwearingen/lab-07-back-end#readme"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MarkArlenSwearingen/lab-07-back-end.git"
-  },
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/MarkArlenSwearingen/lab-07-back-end/issues"
-  },
-  "homepage": "https://github.com/MarkArlenSwearingen/lab-07-back-end#readme",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^7.0.0",
     "express": "^4.16.4",
+    "pg": "^7.10.0",
     "superagent": "^5.0.5"
   }
 }
+
+
