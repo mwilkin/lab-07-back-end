@@ -52,6 +52,19 @@ function Location(query, data){
   this.longitude = data.geometry.location.lng;
 }
 
+function Weather(day){
+  this.forecast = day.summary;
+  this.time = new Date(day.time *1000).toString().slice(0, 15);
+}
+
+function Events(data) {
+  let time = Date.parse(data.start.local);
+  let newDate = new Date(time).toDateString();
+  this.link = data.url;
+  this.name = data.name.text;
+  this.event_date = newDate;
+  this.summary = data.summary;
+}
 //Static function
 // All API calls will be either a static function or attached as a prototype
 
@@ -135,8 +148,6 @@ let getWeather = (request, response) => {
 
   return superagent.get(url)
     .then(result => {
-      //get forecast - refer to comments in API section below
-      //get time
       const weatherSummaries = result.body.daily.data.map(day => {
         return new Weather(day);
       });
@@ -146,11 +157,27 @@ let getWeather = (request, response) => {
     .catch(error => handleErrors(error, response));
 };
 
+let searchEvents = (request, response) => {
+  let url = `https://www.eventbriteapi.com/v3/events/search?token=${process.env.EVENTBRITE_API_KEY}&location.address=${request.query.data.formatted_query}`;
+
+  return superagent.get(url)
+    .then(result => {
+      const eventData = result.body.events.map(event => {
+        return new Events(event);
+      });
+
+      response.send(eventData);
+    })
+    .catch(() => errorMessage());
+};
+
+
 // ----------------------------*
 // Routes (API)
 // ----------------------------*
 app.get(`/location`, getLocation);
 app.get('/weather', getWeather);
+app.get('/events', searchEvents);
 
 // ----------------------------*
 // PowerOn
