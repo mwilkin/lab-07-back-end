@@ -1,14 +1,22 @@
 'use strict';
 
+// ----------------------------*
 // Load Environment Vairables from the .env file
+// ----------------------------*
+
 require('dotenv').config();
+
+// ----------------------------*
+// Application Dependencies
+// ----------------------------*
+
 const express = require('express');
 const cors = require('cors');
 const superagent =  require('superagent');
 const pg = require('pg');
 
 // ----------------------------*
-// Configure Server
+// Application SetUp
 // ----------------------------*
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -31,7 +39,7 @@ client.on('err', err => console.error(err));
 // ----------------------------*
 let handleErrors = (err, response) => {
   console.error(err); // Might as well be a DB save ...
-  if(response) response.status(500).stnd('Internal Server Error Encountered');
+  if(response) response.status(500).send('Internal Server Error Encountered');
 };
 
 // ----------------------------*
@@ -46,16 +54,17 @@ function Location(query, data){
 
 //Static function
 // All API calls will be either a static function or attached as a prototype
+
 Location.fetchLocation = (query) => {
-  const url = `https://maps.googeapis.com/maps/api/geocode/json?address=${data}&key=${process.env.GEOCODE_API_KEY}`;
+  const url = `https://maps.googeapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GEOCODE_API_KEY}`;
 
   return superagent.get(url)
     .then(result => {
-      if(!result.body.results.lenght) throw 'No data';
+      if(!result.body.results.length) throw 'No data';
       let location = new Location(query, result.body.results[0]);
       return location.save()
         .then(result => {
-          location.id = result.row[0].id;
+          location.id = result.rows[0].id;
           return location;
         });
     });
@@ -63,7 +72,7 @@ Location.fetchLocation = (query) => {
 
 Location.lookup = handler => {
   const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
-  const values = [query];
+  const values = [handler.query];
 
   return client.query(SQL, values)
     .then(results => {
@@ -77,8 +86,9 @@ Location.lookup = handler => {
 };
 
 //Use prepared statements to prevent SQL insertion!
+
 Location.prototype.save = function() {
-  let SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longituede)
+  let SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude)
   VALUES ($1, $2, $3, $4)
   RETURNING id;`;
 
@@ -86,6 +96,12 @@ Location.prototype.save = function() {
 
   return client.query(SQL, values);
 };
+
+
+
+// ----------------------------*
+// Weather
+// ----------------------------*
 
 function Weather(day){
   this.forecast = day.summary;
@@ -136,27 +152,8 @@ let getWeather = (request, response) => {
 app.get(`/location`, getLocation);
 app.get('/weather', getWeather);
 
-// app.get('/weather', (request, response) =>{
-//   try {
-//     let darksky = require('./data/darksky.json');
-//     let result = [];
-
-//     darksky.daily.data.forEach(object => {
-//       let date = new Date(object.time * 1000).toString().slice(0,15);
-//       let forecast = object.summary;
-//       let info = getWeather(forecast, date);
-//       result.push(info);
-//     });
-//     response.send(result);
-//   } catch(e) {
-//     let message = handleErrors(e);
-//     response.status(message.status).send(message.responseText);
-//   }
-// });
-
 // ----------------------------*
 // PowerOn
 // ----------------------------*
-//Make sure the server is listening for requests - entry point
-//Console.log message is super helpful
+
 app.listen(PORT, () => console.log(`App is listening on ${PORT}`));
