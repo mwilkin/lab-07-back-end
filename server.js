@@ -152,27 +152,8 @@ let getWeather = (request, response) => {
 app.get(`/location`, getLocation);
 app.get('/weather', getWeather);
 
-// app.get('/weather', (request, response) =>{
-//   try {
-//     let darksky = require('./data/darksky.json');
-//     let result = [];
-
-//     darksky.daily.data.forEach(object => {
-//       let date = new Date(object.time * 1000).toString().slice(0,15);
-//       let forecast = object.summary;
-//       let info = getWeather(forecast, date);
-//       result.push(info);
-//     });
-//     response.send(result);
-//   } catch(e) {
-//     let message = handleErrors(e);
-//     response.status(message.status).send(message.responseText);
-//   }
-// });
-
 // ----------------------------*
 // PowerOn
 // ----------------------------*
-//Make sure the server is listening for requests - entry point
-//Console.log message is super helpful
+
 app.listen(PORT, () => console.log(`App is listening on ${PORT}`));
