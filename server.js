@@ -1,74 +1,43 @@
 'use strict';
 
-// ----------------------------*
-// Load Environment Vairables from the .env file
-// ----------------------------*
-
+//--------------------------------
+// Load Enviroment Variables from the .env file
+//--------------------------------
 require('dotenv').config();
 
-// ----------------------------*
+//--------------------------------
 // Application Dependencies
-// ----------------------------*
-
+//--------------------------------
 const express = require('express');
 const cors = require('cors');
-const superagent =  require('superagent');
+const superagent = require('superagent');
 const pg = require('pg');
 
-// ----------------------------*
-// Application SetUp
-// ----------------------------*
+//--------------------------------
+// Application setup
+//--------------------------------
 const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
 
-// ----------------------------*
-// Database Config
-// ----------------------------*
+//--------------------------------
+// Database Configuration
+//--------------------------------
 // 1. Create a client with connection url
-const client = new pg.Client(process.env.PG_CONNECTION_URL);
 
-//  2.  Connect client
+const client = new pg.Client(process.env.DATABASE_URL);
+
+//2. Connect client
+
 client.connect();
 
-// 3. Add event listenters
-client.on('err', err => console.error(err));
+// 3. Add event listeners
 
-// ----------------------------*
-// Errors
-// ----------------------------*
-let handleErrors = (err, response) => {
-  console.error(err); // Might as well be a DB save ...
-  if(response) response.status(500).send('Internal Server Error Encountered');
-};
+client.on('err', err => console.log(err));
 
-// ----------------------------*
-// Constructor Functions
-// ----------------------------*
-function Location(query, data){
-  this.search_query = query;
-  this.formatted_query = data.formatted_address;
-  this.latitude = data.geometry.location.lat;
-  this.longitude = data.geometry.location.lng;
-}
-
-function Weather(day){
-  this.forecast = day.summary;
-  this.time = new Date(day.time *1000).toString().slice(0, 15);
-}
-
-function Events(data) {
-  let time = Date.parse(data.start.local);
-  let newDate = new Date(time).toDateString();
-  this.link = data.url;
-  this.name = data.name.text;
-  this.event_date = newDate;
-  this.summary = data.summary;
-}
-
-// ----------------------------*
-// Helper Function
-// ----------------------------*
+//--------------------------------
+// Helper Func
+//--------------------------------
 
 let lookup = (handler) => {
   const SQL = `SELECT * FROM ${handler.tableName} WHERE location_id=$1;`;
@@ -84,32 +53,56 @@ let lookup = (handler) => {
     .catch(errorMessage);
 };
 
-//Static function
-// All API calls will be either a static function or attached as a prototype
+let deleteByLocationId = (table, location_id) => {
+  const SQL = `DELETE FROM ${table} WHERE location_id=${location_id}`;
 
-Location.lookup = handler => {
-  const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
-  const values = [handler.query];
-
-  return client.query(SQL, values)
-    .then(results => {
-      if(results.rowcount > 0) {
-        handler.cacheHit(results);
-      }else{
-        handler.cacheMiss(results);
-      }
-    })
-    .catch(console.error);
+  return client.query(SQL);
 };
 
+const timeouts = {
+  weather: 15 * 1000, //15 seconds per request
+  event: 60 * 60 * 1000, //hourly update for latest events
+  movie: 60 * 60 * 24 * 1000, // daily movies updates
+  yelp: 60 * 60 * 4 * 1000 // update every 4 hours
+};
 
-Location.fetchLocation = (query) => {
-  const url = `https://maps.googeapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GEOCODE_API_KEY}`;
+//--------------------------------
+// Error Message
+//--------------------------------
+
+// This a error message callback function which will send a server status message of 500, if an internal server error is encountered.
+
+let errorMessage = (error, response) => {
+  console.error(error);
+  if (response) response.status(500).send('Internal server error encountered');
+};
+
+//--------------------------------
+// Constructors Functions
+//--------------------------------
+
+// Constructor functions which filter the data from the query response that we are interested in.
+
+//--------------------------------
+// Locations
+//--------------------------------
+
+function CityLocation(query, data) {
+  this.search_query = query;
+  this.formatted_query = data.formatted_address;
+  this.latitude = data.geometry.location.lat;
+  this.longitude = data.geometry.location.lng;
+}
+
+CityLocation.tableName = 'locations';
+
+CityLocation.fetchLocation = (query) => {
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GEOCODE_API_KEY}`;
 
   return superagent.get(url)
     .then(result => {
       if(!result.body.results.length) throw 'No data';
-      let location = new Location(query, result.body.results[0]);
+      let location = new CityLocation(query, result.body.results[0]);
       return location.save()
         .then(result => {
           location.id = result.rows[0].id;
@@ -119,79 +112,25 @@ Location.fetchLocation = (query) => {
 };
 
 
-Location.prototype.save = function() {
-  let SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude)
-  VALUES ($1, $2, $3, $4)
-  RETURNING id;`;
+CityLocation.lookup = handler => {
+  const SQL = 'SELECT * FROM locations WHERE search_query=$1;';
+  const values = [handler.query];
 
-  let values = Object.values(this);
-
-  return client.query(SQL, values);
-};
-
-// ----------------------------*
-// Weather
-// ----------------------------*
-
-
-let getWeather = (request, response) => {
-  const data = request.query.data;
-  const url = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${data.latitude},${data.longitude}`;
-
-  return superagent.get(url)
-    .then(result => {
-      const weatherSummaries = result.body.daily.data.map(day => {
-        return new Weather(day);
-      });
-
-      response.send(weatherSummaries);
+  return client.query(SQL, values)
+    .then(results => {
+      if(results.rowCount > 0){
+        handler.cacheHit(results);
+      }else{
+        handler.cacheMiss(results);
+      }
     })
-    .catch(error => handleErrors(error, response));
+    .catch(console.error);
 };
 
-let searchWeather = (request, response) => {
-  // console.log(request.query.data);
-  const weatherHandler = {
-    query: request.query.data,
-    cacheHit: results => {
-      console.log('Got the data Weather');
-      response.send(results[0]);
-    },
-    cacheMiss: () => {
-      console.log('Fetching Weather');
-      Weather.fetchWeather(request.query.data)
-        .then(results => response.send(results));
-    }
-  };
-  Weather.lookup(weatherHandler);
-};
-
-Weather.fetchWeather = (query) => {
-  // console.log(query);
-  const url = `https://api.darksky.net/forecast/${process.env.WEATHER_API_KEY}/${query.latitude},${query.longitude}`;
-
-  return superagent.get(url)
-    .then(result => {
-      // console.log(result.body);
-      if(!result.body && !result.body.daily) throw 'No data';
-      let weather = result.body.daily.data.map(day => {
-        return new Weather(day);
-      });
-      // console.log(result);
-      console.log(query.id);
-      return weather.save()
-        .then(() => {
-          weather.id = query.id;
-          console.log('HI');
-          return weather;
-        });
-    });
-};
-
-Weather.prototype.save = function(){
-  let SQL = `INSERT INTO weathers 
-    (forecast, time)
-    VALUES ($1, $2)
+CityLocation.prototype.save = function(){
+  let SQL = `INSERT INTO locations
+    (search_query, formatted_query, latitude, longitude)
+    VALUES ($1, $2, $3, $4)
     RETURNING id;`;
 
   let values = Object.values(this);
@@ -199,48 +138,63 @@ Weather.prototype.save = function(){
   return client.query(SQL, values);
 };
 
-// ----------------------------*
-// Route Callbacks
-// ----------------------------*
+//--------------------------------
+// Weather
+//--------------------------------
 
-let getLocation = (request, response) => {
+function Weather(day) {
+  this.forecast = day.summary;
+  this.time = new Date(day.time * 1000).toString().slice(0, 15);
+  this.created_at = Date.now();
+}
 
-  const locationHandler = {
-    query: request.query.data,
-    cacheHit: results => {
-      console.log('Got data from DB');
-      response.send(results[0]);
-    },
-    casheMiss:  () => {
-      Location.fetchLocation(request.query.data)
-        .then(results => response.send(results));
-    }
-  };
+Weather.tableName = 'weathers';
+Weather.lookup = lookup;
+Weather.deleteByLocationId = deleteByLocationId;
 
-  Location.lookup(locationHandler);
-};
-
-
-// ----------------------------*
-// Events
-// ----------------------------*
-
-Events.tableName = 'events';
-Events.lookup = lookup;
-
-let searchEvents = (request, response) => {
-  let url = `https://www.eventbriteapi.com/v3/events/search?token=${process.env.EVENTBRITE_API_KEY}&location.address=${request.query.data.formatted_query}`;
+Weather.fetchWeather = (location) => {
+  const url = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${location.latitude},${location.longitude}`;
 
   return superagent.get(url)
     .then(result => {
-      const eventData = result.body.events.map(event => {
-        return new Events(event);
+      const weatherSum = result.body.daily.data.map(day => {
+        const summary = new Weather(day);
+        summary.save(location.id);
+        return summary;
       });
-
-      response.send(eventData);
+      return weatherSum;
     })
-    .catch(() => errorMessage());
+    .catch(console.error);
 };
+
+Weather.prototype.save = function(id){
+  const SQL = `INSERT INTO weathers
+    (forecast, time, created_at, location_id)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id;`;
+
+  let values = Object.values(this);
+  values.push(id);
+
+  return client.query(SQL, values);
+};
+
+//--------------------------------
+// Events
+//--------------------------------
+
+function Events(location) {
+  let time = Date.parse(location.start.local);
+  this.event_date = new Date(time).toDateString();
+  this.link = location.url;
+  this.name = location.name.text;
+  this.summary = location.summary;
+  this.created_at = Date.now();
+}
+
+Events.tableName = 'events';
+Events.lookup = lookup;
+Events.deleteByLocationId = deleteByLocationId;
 
 Events.fetchEvent = (location) => {
   const url = `https://www.eventbriteapi.com/v3/events/search?token=${process.env.EVENTBRITE_API_KEY}&location.address=${location.formatted_query}`;
@@ -267,15 +221,211 @@ Events.prototype.save = function(id){
   return client.query(SQL, values);
 };
 
-// ----------------------------*
-// Routes (API)
-// ----------------------------*
-app.get(`/location`, getLocation);
-app.get('/weather', getWeather);
-app.get('/events', searchEvents);
 
-// ----------------------------*
-// PowerOn
-// ----------------------------*
+//--------------------------------
+// Movies
+//--------------------------------
 
-app.listen(PORT, () => console.log(`App is listening on ${PORT}`));
+function Movies(location) {
+  this.title = location.title;
+  this.released_on = location.release_date;
+  this.total_votes = location.vote_count;
+  this.average_votes = location.vote_average;
+  this.popularity = location.popularity;
+  this.overview = location.overview;
+  this.image_url = `https://image.tmdb.org/t/p/original${location.poster_path}`;
+  this.created_at = Date.now();
+}
+
+Movies.tableName = 'movies';
+Movies.lookup = lookup;
+Movies.deleteByLocationId = deleteByLocationId;
+
+Movies.prototype.save = function(id){
+  const SQL = `INSERT INTO movies
+    (title, released_on, total_votes, average_votes, popularity, overview, image_url, created_at, location_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`;
+
+  let values = Object.values(this);
+  values.push(id);
+
+  return client.query(SQL, values);
+};
+
+Movies.fetchMovie = (location) => {
+  const url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${process.env.MOVIE_API_KEY}&language=en-US&page=1`;
+  return superagent.get(url)
+    .then(result => {
+      const movieSummaries = result.body.results.map(movie => {
+        const summary = new Movies(movie);
+        summary.save(location.id);
+        return summary;
+      });
+      return movieSummaries;
+    })
+    .catch(console.error);
+};
+
+//--------------------------------
+// Yelps
+//--------------------------------
+
+function Yelp(location) {
+  this.name = location.name;
+  this.rating = location.rating;
+  this.price = location.price;
+  this.url = location.url;
+  this.image_url = location.image_url;
+  this.created_at = Date.now();
+}
+
+Yelp.tableName = 'yelps';
+Yelp.lookup = lookup;
+Yelp.deleteByLocationId = deleteByLocationId;
+
+Yelp.prototype.save = function(id){
+  const SQL = `INSERT INTO yelps
+    (name, rating, price, url, image_url, created_at, location_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7);`;
+
+  let values = Object.values(this);
+  values.push(id);
+
+  return client.query(SQL, values);
+};
+
+Yelp.fetchYelp = (location) => {
+  // const url = `https://api.yelp.com/v3/businesses/search?location=${location.search_query}`;
+  const url = `https://api.yelp.com/v3/businesses/search?latitude=${location.latitude}&longitude=${location.longitude}`;
+
+
+  return superagent.get(url)
+    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+    .then(result => {
+      const yelpSummaries = result.body.businesses.map(review => {
+        const summary = new Yelp(review);
+        summary.save(location.id);
+        return summary;
+      });
+      return yelpSummaries;
+    })
+    .catch(console.error);
+};
+
+//--------------------------------
+// Route Callbacks
+//--------------------------------
+
+// Locations
+let searchCoords = (request, response) => {
+  const locationHandler = {
+    query: request.query.data,
+    cacheHit: results => {
+      console.log('Got data from DB');
+      response.send(results.rows[0]);
+
+    },
+    cacheMiss: () => {
+      console.log('Fetching location....');
+      CityLocation.fetchLocation(request.query.data)
+        .then(results => response.send(results));
+    }
+  };
+  CityLocation.lookup(locationHandler);
+};
+
+// Weathers
+let searchWeather = (request, response) => {
+  const weatherHandler = {
+    location: request.query.data,
+    tableName: Weather.tableName,
+    cacheHit: function(result){
+      let ageOfRes = (Date.now() - result.rows[0].created_at);
+      if (ageOfRes > timeouts.weather){
+        console.log('Weather cache is invaild');
+        Weather.deleteByLocationId(Weather.tableName, request.query.data.id);
+        this.cacheMiss();
+      }else {
+        console.log('Weather cache valid');
+        response.send(result.rows);
+      }
+    },
+    cacheMiss: () => {
+      console.log('Fetching weather...');
+      Weather.fetchWeather(request.query.data)
+        .then(results => response.send(results))
+        .catch(console.error);
+    }
+  };
+  Weather.lookup(weatherHandler);
+};
+
+// Events
+let seachEvents = (request, response) => {
+  const eventHandler = {
+    location: request.query.data,
+    tableName: Events.tableName,
+    cacheHit: function(result){
+      let ageOfRes = (Date.now() - result.rows[0].created_at);
+      if (ageOfRes > timeouts.event){
+        console.log('Event cache is invailid');
+        Events.deleteByLocationId(Events.tableName, request.query.data.id);
+        this.cacheMiss();
+      } else {
+        console.log('Events cache valid');
+        response.send(result.rows);
+      }
+    },
+    cacheMiss: () => {
+      console.log('Fetching events...');
+      Events.fetchEvent(request.query.data)
+        .then(results => response.send(results))
+        .catch(console.error);
+    }
+  };
+  Events.lookup(eventHandler);
+};
+
+// Movies
+let searchMovies = (request, response) => {
+  const eventHandler = {
+    location: request.query.data,
+    tableName: Movies.tableName,
+    cacheHit: function(result){
+      let ageOfResults = (Date.now() - result.rows[0].created_at);
+      if(ageOfResults > timeouts.movie){
+        console.log('Movie cache was invalid');
+        Movies.deleteByLocationId(Movies.tableName, request.query.data.id);
+        this.cacheMiss;
+      } else {
+        console.log('Movie cache was valid');
+        response.send(result.rows);
+      }
+    },
+    cacheMiss: () => {
+      console.log('Fetching movies...');
+      Movies.fetchMovie(request.query.data)
+        .then(results => response.send(results))
+        .catch(console.error);
+    }
+  };
+  Movies.lookup(eventHandler);
+};
+
+//--------------------------------
+// Routes
+//--------------------------------
+
+// Refer to how our application enpoints (URI) respond to the client requests.
+
+app.get('/location', searchCoords);
+app.get('/weather', searchWeather);
+app.get('/events', seachEvents);
+app.get('/movies', searchMovies);
+
+
+//--------------------------------
+// Power On
+//--------------------------------
+app.listen(PORT, () => console.log(`app is listening ${PORT}`));
+
