@@ -213,7 +213,8 @@ Events.fetchEvent = (location) => {
 Events.prototype.save = function(id){
   const SQL = `INSERT INTO events
     (date, link, name, summary, created_at, location_id)
-    VALUES ($1, $2, $3, $4, $5, $6);`;
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING id;`;
 
   const values = Object.values(this);
   values.push(id);
@@ -244,7 +245,8 @@ Movies.deleteByLocationId = deleteByLocationId;
 Movies.prototype.save = function(id){
   const SQL = `INSERT INTO movies
     (title, released_on, total_votes, average_votes, popularity, overview, image_url, created_at, location_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`;
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING id;`;
 
   let values = Object.values(this);
   values.push(id);
@@ -266,51 +268,6 @@ Movies.fetchMovie = (location) => {
     .catch(console.error);
 };
 
-//--------------------------------
-// Yelps
-//--------------------------------
-
-function Yelp(location) {
-  this.name = location.name;
-  this.rating = location.rating;
-  this.price = location.price;
-  this.url = location.url;
-  this.image_url = location.image_url;
-  this.created_at = Date.now();
-}
-
-Yelp.tableName = 'yelps';
-Yelp.lookup = lookup;
-Yelp.deleteByLocationId = deleteByLocationId;
-
-Yelp.prototype.save = function(id){
-  const SQL = `INSERT INTO yelps
-    (name, rating, price, url, image_url, created_at, location_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7);`;
-
-  let values = Object.values(this);
-  values.push(id);
-
-  return client.query(SQL, values);
-};
-
-Yelp.fetchYelp = (location) => {
-  // const url = `https://api.yelp.com/v3/businesses/search?location=${location.search_query}`;
-  const url = `https://api.yelp.com/v3/businesses/search?latitude=${location.latitude}&longitude=${location.longitude}`;
-
-
-  return superagent.get(url)
-    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
-    .then(result => {
-      const yelpSummaries = result.body.businesses.map(review => {
-        const summary = new Yelp(review);
-        summary.save(location.id);
-        return summary;
-      });
-      return yelpSummaries;
-    })
-    .catch(console.error);
-};
 
 //--------------------------------
 // Route Callbacks
